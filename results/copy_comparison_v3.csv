@@ -1,0 +1,4 @@
+model,memory_gap,best_epoch,test_loss,test_digit_accuracy,test_exact_sequence_accuracy
+TCN,20,9,0.08669781032949686,0.9998046875,0.998046875
+LSTM,20,15,2.0806991159915924,0.12421875,0.0
+GRU,20,27,1.6940786689519882,0.3021484375,0.0

@@ -1,0 +1,15 @@
+task,configuration,model,metric,value,notes
+Adding Problem,Sequence length 100,TCN,Test MSE,0.009946193546056747,Constant baseline MSE = 0.17104
+Adding Problem,Sequence length 100,LSTM,Test MSE,0.1707942634820938,Constant baseline MSE = 0.17104
+Adding Problem,Sequence length 100,GRU,Test MSE,0.012468503788113594,Constant baseline MSE = 0.17104
+Copy Memory,Memory gap 100; total length 120,TCN,Test recall accuracy (%),12.8173828125,Long-gap recall experiment
+Copy Memory,Memory gap 100; total length 120,LSTM,Test recall accuracy (%),12.998046875,Long-gap recall experiment
+Copy Memory,Memory gap 100; total length 120,GRU,Test recall accuracy (%),15.908203125,Long-gap recall experiment
+Copy Memory diagnostic,Memory gap 20; total length 40,TCN,Test digit accuracy (%),99.98046875,Exact sequence accuracy = 99.80%
+Copy Memory diagnostic,Memory gap 20; total length 40,LSTM,Test digit accuracy (%),12.421875,Exact sequence accuracy = 0.00%
+Copy Memory diagnostic,Memory gap 20; total length 40,GRU,Test digit accuracy (%),30.214843749999996,Exact sequence accuracy = 0.00%
+Sequential MNIST,Train 12000; validation 2000; test 5000; 8 epochs,TCN,Test accuracy (%),91.22,Test loss = 0.28756
+Sequential MNIST,Train 12000; validation 2000; test 5000; 8 epochs,LSTM,Test accuracy (%),11.08,Test loss = 2.30219
+Sequential MNIST,Train 12000; validation 2000; test 5000; 8 epochs,GRU,Test accuracy (%),42.32,Test loss = 1.62369
+Adding Problem ablation,Dilation = True; receptive field = 125,adding_ablation_dilated,Test MSE,0.022133804275654256,Constant baseline MSE = 0.17104
+Adding Problem ablation,Dilation = False; receptive field = 21,adding_ablation_no_dilation,Test MSE,0.15266077453270555,Constant baseline MSE = 0.17104

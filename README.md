@@ -1,197 +1,119 @@
-# Temporal Convolutional Networks (TCN)
+# Temporal Convolutional Networks for Sequence Modeling
 
-An independent PyTorch implementation and reduced-scale evaluation of Temporal Convolutional Networks for sequence modeling.
+A PyTorch implementation of a **Temporal Convolutional Network (TCN)** based on Bai, Kolter, and Koltun (2018), with small-scale comparisons against LSTM and GRU baselines on the Adding Problem, Copy Memory, and Sequential MNIST.
 
-## 1. Reference Paper
+> **Project status:** This is a learning-oriented experimental implementation, not an exact reproduction of the paper. The notebook has been run end-to-end and its measured CSV tables and plots are included in `results/`. Results describe one saved run; they are not multi-seed averages.
 
-**Title:** An Empirical Evaluation of Generic Convolutional and Recurrent Networks for Sequence Modeling
+## Reference
 
-**Authors:** Shaojie Bai, J. Zico Kolter, Vladlen Koltun
+Shaojie Bai, J. Zico Kolter, and Vladlen Koltun, [*An Empirical Evaluation of Generic Convolutional and Recurrent Networks for Sequence Modeling*](https://arxiv.org/abs/1803.01271), 2018. The authors' reference implementation is available at [locuslab/TCN](https://github.com/locuslab/TCN).
 
-**Paper:** https://arxiv.org/abs/1803.01271
+## What is implemented
 
-**Official reference implementation:** https://github.com/locuslab/TCN
+- Causal 1D convolutions so an output at time *t* does not depend on future inputs.
+- Dilated convolution layers, residual connections, dropout, and a receptive-field calculation.
+- TCN, LSTM, and GRU comparisons on three sequence-learning tasks.
+- A controlled Adding Problem ablation comparing a dilated TCN with a non-dilated TCN of the same parameter count.
+- Saved experiment tables, a consolidated summary, a paper-reference comparison, and plots under `results/`.
 
-The reference paper evaluates TCNs against recurrent models on synthetic sequence tasks and real-world datasets. This project focuses on the assigned Adding Problem, Copy Memory, and Sequential MNIST benchmarks.
+The notebook loads `tcn.py` from this repository in its first code cell. Open `TCN_Implementation.ipynb` in Google Colab, select a GPU runtime (the executed run used a Tesla T4), and run the notebook from top to bottom. MNIST is downloaded by `torchvision` when needed. Required libraries are PyTorch, torchvision, pandas, and matplotlib; Colab normally supplies them already.
 
-## 2. Implementation
+## Experiments and current results
 
-The core implementation is written independently in PyTorch in `tcn.py`.
+All values below come from the saved notebook run. Lower MSE is better; higher accuracy is better.
 
-The TCN contains:
-- Causal 1D convolutions with left padding.
-- Dilated convolutions with exponentially increasing dilation.
-- Residual blocks with channel projection when required.
-- ReLU activations, dropout, and optional weight normalization.
-- A configurable temporal convolutional network with a calculated receptive field.
+### 1. Adding Problem
 
-LSTM and GRU baselines use standard PyTorch recurrent layers. The notebook contains the task-specific model wrappers, data generators, training loops, evaluation, checkpointing, and plotting code.
+The input is a sequence of 100 random values with two marked positions. The target is the sum of the two marked values. Training/validation/test sizes are 4,096 / 1,024 / 2,048; training runs for 20 epochs. The TCN and GRU use five 16-channel temporal blocks (kernel size 3, dropout 0.1); the recurrent baseline uses a 48-unit hidden state.
 
-## 3. Requirements and Setup
+| Model | Parameters | Test MSE | Constant baseline MSE |
+|---|---:|---:|---:|
+| TCN | 7,393 | **0.009946** | 0.171037 |
+| GRU | 7,537 | 0.012469 | 0.171037 |
+| LSTM | 10,033 | 0.170794 | 0.171037 |
 
-The recommended environment is Google Colab with a GPU runtime when available.
+**Interpretation:** TCN and GRU learn this task in the current setup. The LSTM result is effectively at the constant-prediction baseline: its numerical improvement is only about 0.000243 MSE and should not be described as meaningful learning.
 
-The notebook uses:
-- Python
-- PyTorch
-- torchvision
-- pandas
-- matplotlib
+### 2. Copy Memory — long gap
 
-A GPU is helpful for Sequential MNIST, but availability depends on Colab's resource allocation.
+The total sequence length is 120 (memory gap 100). The first ten input tokens are digits sampled from 1–8; one delimiter token `9` is placed at position `-11`; the final ten input tokens are zero. Targets are zero except for the final ten positions, which copy the original ten digits. The training objective weights each of the final ten target positions by 10. Training/validation/test sizes are 4,096 / 1,024 / 2,048, with 20 epochs.
 
-### Running the project
+| Model | Test accuracy on final ten digits |
+|---|---:|
+| TCN | 12.82% |
+| LSTM | 13.00% |
+| GRU | 15.91% |
 
-1. Open `TCN_Implementation.ipynb` in Google Colab.
-2. Ensure the notebook has access to the Google Drive folder `DL_TCN_Project`.
-3. Run the notebook cells in order, starting with the setup and TCN validation cells.
-4. Verify the model shape and causality tests before running experiments.
-5. Training checkpoints, histories, results, and plots are saved in Google Drive.
-6. Inspect the saved CSV files for the final reported metrics.
+**Interpretation:** None of the models reliably solves long-gap recall in this setup. These scores are low and close to the 10% per-digit accuracy expected from uniform guessing over ten classes. The notebook also records an all-zero prediction baseline of 0%; that is a different, deliberately simple baseline and should not be confused with chance accuracy. The TCN receptive field is 125 time steps, so it spans this 120-step input, yet the task still fails—having sufficient receptive field is not by itself sufficient to learn recall.
 
-Do not use **Run all** without checking the checkpoint configuration and execution order. Training cells can resume compatible saved experiments, but a fresh runtime still needs its imports, datasets, and model definitions initialized.
+### 3. Copy Memory — short-gap diagnostic
 
-### Project outputs
+This diagnostic uses memory gap 20 (total length 40), 2,048 / 512 / 1,024 train/validation/test examples, and 30 epochs. The training/evaluation loss and accuracy focus on the final ten recall positions.
 
-The Drive project directory contains:
-
-- `checkpoints/` — latest and best model checkpoints.
-- `results/` — experiment comparisons, training histories, and consolidated results.
-- `results/plots/` — generated figures.
-- `data/mnist/` — downloaded MNIST dataset.
-- `report/` — reserved for report materials.
-
-Large model checkpoints and datasets are not required to be committed to GitHub.
-
-## 4. Experimental Configuration
-
-### Adding Problem
-
-- Sequence length: 100.
-- Training samples: 4,096.
-- Validation samples: 1,024.
-- Test samples: 2,048.
-- Training epochs: 20 per model.
-- TCN: five blocks, 16 channels per block, kernel size 3, dropout 0.1.
-- LSTM and GRU: hidden size 48.
-- Evaluation metric: test mean squared error (MSE).
-- Measured constant-prediction baseline: MSE 0.17104.
-
-### Copy Memory
-
-Two configurations were evaluated.
-
-**Longer-gap run**
-- Memory gap: 100.
-- Total sequence length: 120.
-- Training samples: 4,096.
-- Validation samples: 1,024.
-- Test samples: 2,048.
-- Training epochs: 20.
-- Metric: accuracy on the final ten recalled digits.
-
-**Shorter-gap diagnostic**
-- Memory gap: 20.
-- Total sequence length: 40.
-- Training samples: 2,048.
-- Validation samples: 512.
-- Test samples: 1,024.
-- Training epochs: 30.
-- Metric: accuracy on the final ten recalled digits, plus exact-sequence accuracy.
-- The training loss focuses on the final ten recall positions.
-
-The shorter-gap diagnostic is not a reproduction of the paper's longest Copy Memory benchmark.
-
-### Sequential MNIST
-
-- Training samples: 12,000.
-- Validation samples: 2,000.
-- Test samples: 5,000.
-- Training epochs: 8 per model.
-- Sequence length: 784 pixels.
-- The image is flattened into a sequence of pixel intensities.
-- Metric: test classification accuracy.
-
-### Dilation Ablation
-
-- Task: Adding Problem.
-- Five temporal blocks with 16 channels per block.
-- Kernel size: 3.
-- Dropout: 0.1.
-- Training epochs: 20 per configuration.
-- Comparison: exponential dilation versus fixed dilation of 1.
-- The dataset splits are held fixed.
-- Receptive fields: 125 steps with dilation and 21 steps without dilation.
-
-## 5. Results
-
-These are the actual results from the saved experiments. The paper's results use different model sizes, sequence lengths, training configurations, or metrics in some cases.
-
-### Adding Problem
-
-| Model | Test MSE | Constant baseline |
+| Model | Test digit accuracy | Exact ten-digit sequence accuracy |
 |---|---:|---:|
-| TCN | 0.013991 | 0.171037 |
-| LSTM | 0.171229 | 0.171037 |
-| GRU | 0.015329 | 0.171037 |
+| TCN | **99.98%** | **99.80%** |
+| LSTM | 12.42% | 0.00% |
+| GRU | 30.21% | 0.00% |
 
-The TCN and GRU learned to reduce the prediction error substantially below the baseline. The LSTM did not improve meaningfully under the selected training configuration.
+**Interpretation:** The TCN solves the short-gap diagnostic, while the recurrent baselines do not reproduce a complete sequence in this configuration. This diagnostic is not the paper's long-memory benchmark and should be labeled separately.
 
-### Copy Memory
+### 4. Sequential MNIST
 
-| Model | Test recall accuracy, gap 100 | Test digit accuracy, gap 20 |
+Each 28×28 image is flattened into a sequence of 784 pixel values, and the model predicts one of ten digit classes from the final sequence representation. The run uses 12,000 training images, 2,000 validation images selected from the MNIST training set, and a 5,000-image test subset; training lasts eight epochs with batch size 128. The TCN has eight 16-channel blocks, kernel size 3, dropout 0.1, and receptive field 1,021. LSTM and GRU use 64 hidden units.
+
+| Model | Parameters | Test accuracy |
 |---|---:|---:|
-| TCN | 12.62% | 99.94% |
-| LSTM | 12.35% | 12.42% |
-| GRU | 15.25% | 32.13% |
+| TCN | 12,282 | **91.22%** |
+| GRU | 13,514 | 42.32% |
+| LSTM | 17,802 | 11.08% |
 
-On the shorter-gap diagnostic, the TCN also achieved 99.41% exact-sequence accuracy. The longer-gap experiment did not achieve reliable recall for any of the three models.
+**Interpretation:** The TCN achieves the best test accuracy in this limited-data, eight-epoch setup. These results are not directly comparable to the paper's full benchmark settings: this run uses subsets of MNIST, fewer training epochs, and smaller models.
 
-The longer-gap experiment reports recall accuracy, while the reference paper reports loss in its comparison table. These values must not be compared numerically as if they were the same metric.
+### 5. Dilation ablation — Adding Problem
 
-### Sequential MNIST
+Both ablation models have 7,393 parameters, use the same Adding Problem data split (4,096 / 1,024 / 2,048), and train for 20 epochs. The dilated model uses five blocks with dilations 1, 2, 4, 8, and 16; the non-dilated model uses dilation 1 in every block.
 
-| Model | Test accuracy | Parameter count |
-|---|---:|---:|
-| TCN | 92.34% | 12,282 |
-| LSTM | 11.08% | 17,802 |
-| GRU | 42.32% | 13,514 |
+| Configuration | Receptive field | Parameters | Test MSE |
+|---|---:|---:|---:|
+| Dilated TCN | 125 | 7,393 | **0.022134** |
+| Non-dilated TCN | 21 | 7,393 | 0.152661 |
+| Constant-prediction baseline | — | — | 0.171037 |
 
-The TCN learned the task under the reduced-scale training configuration. The recurrent baselines did not converge adequately within the selected eight epochs.
+**Interpretation:** Dilation substantially improves the Adding Problem result in this single-run ablation. It is evidence for this configuration, not a multi-seed statistical conclusion.
 
-### Dilation Ablation
+## Repository contents
 
-| Configuration | Receptive field | Test MSE |
-|---|---:|---:|
-| Dilated TCN | 125 | 0.023378 |
-| TCN without dilation | 21 | 0.153073 |
+```text
+.
+├── tcn.py
+├── TCN_Implementation.ipynb
+└── results/
+    ├── adding_comparison.csv
+    ├── copy_comparison_v2.csv
+    ├── copy_comparison_v3.csv
+    ├── seq_mnist_comparison.csv
+    ├── adding_dilation_ablation.csv
+    ├── final_results_summary.csv
+    ├── paper_vs_our_results.csv
+    └── plots/
+        ├── adding_problem_mse.png
+        ├── copy_memory_accuracy.png
+        ├── sequential_mnist_accuracy.png
+        └── dilation_ablation.png
+```
 
-The dilated configuration achieved lower test MSE in this experiment. Both models used the same data splits and channel widths.
+The CSVs and figures in this repository are a **snapshot of the included run**. A fresh Colab run writes new artifacts to its local `results/` directory, which is temporary. Download/copy any new outputs before the runtime resets if you want to keep and commit them.
 
-## 6. Random Seeds and Reproducibility
+## Important limitations
 
-The main experiments use fixed data-generation seeds and fixed model initialization seeds.
+- The experiments use smaller datasets, fewer epochs, and different settings than the paper; the project should not be presented as an exact reproduction.
+- The long-gap Copy Memory task is not solved by any of the tested models.
+- Only one run per configuration is reported. Although seeds are set in the experiment code, GPU operations may be nondeterministic, and no mean or standard deviation across repeated seeds is available.
+- Small differences from older notebook/README versions can reflect revised code or task definitions as well as training randomness. Do not attribute every change solely to GPU nondeterminism.
+- The `beats_baseline` Boolean in `adding_comparison.csv` is a strict numerical comparison. For LSTM, `True` reflects a tiny numerical margin and does not indicate meaningful learning.
+- The paper-reference CSV is contextual only. The settings and metrics differ in several rows, so numeric comparisons should not be interpreted as like-for-like reproduction results.
 
-- Adding Problem data: 101 (training), 202 (validation), 303 (test). Model seeds: 1000, 1001, 1002.
-- Copy Memory longer-gap data: 101, 202, 303. Model seeds: 2000, 2001, 2002.
-- Copy Memory shorter-gap data: 401, 402, 403. Model seeds: 5000, 5001, 5002.
-- Sequential MNIST: split seed 12345; model seeds 6000, 6001, 6002.
-- Dilation ablation data: 101, 202, 303. Experiment seeds: 7101 and 7102.
+## Suggested next work
 
-The notebook saves checkpoints after completed epochs, including model weights and optimizer state, so compatible interrupted runs can resume. The reported results are from individual reduced-scale runs; repeated-seed statistical evaluation was not performed.
-
-## 7. Limitations
-
-This project is a reduced-scale implementation, not a full reproduction of every experiment in the reference paper.
-
-The Copy Memory benchmark uses shorter sequences than the paper's longest benchmark. The recurrent baselines in Sequential MNIST and Copy Memory did not achieve strong performance under the selected training budgets. These results should not be interpreted as proof that recurrent networks are generally ineffective.
-
-The dilation ablation supports the benefit of a larger receptive field in the tested Adding Problem setup, but it is a single controlled experiment rather than a multi-seed statistical study.
-
-## 8. References
-
-Bai, S., Kolter, J. Z., and Koltun, V. (2018). *An Empirical Evaluation of Generic Convolutional and Recurrent Networks for Sequence Modeling*. arXiv:1803.01271.
-
-Paper: https://arxiv.org/abs/1803.01271
-
-Reference code: https://github.com/locuslab/TCN
+After studying the current implementation, the highest-value follow-ups are: validate the long-gap Copy Memory generator and training objective against a clearly documented benchmark definition; report several seeds with mean ± standard deviation; and run controlled receptive-field/sequence-length experiments. Changes should be made only after the current code and metrics are understood.
